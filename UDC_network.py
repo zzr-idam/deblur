@@ -27,7 +27,7 @@ class ApplyCoeffs(nn.Module):
         return torch.cat([R, G, B], dim=1)
  
  
-def MLP_A(deep):
+def MLP_A_real(deep):
 
     return nn.Sequential(*[nn.Sequential(
             nn.Linear(64, 64),
@@ -42,8 +42,37 @@ def MLP_A(deep):
             nn.Linear(64, 64),
             nn.PReLU(),      
         ) for _ in range(deep)])
+def MLP_A_imag(deep):
     
-def MLP_B(deep):
+    return nn.Sequential(*[nn.Sequential(
+            nn.Linear(64, 64),
+            nn.PReLU(),
+            Rearrange('b c w h -> b c h w'),
+            nn.Linear(64, 64),
+            nn.PReLU(),
+            Rearrange('b c h w -> b w h c'),
+            nn.Linear(3, 3),
+            nn.PReLU(),
+            Rearrange('b w h c -> b c w h'),
+            nn.Linear(64, 64),
+            nn.PReLU(),      
+        ) for _ in range(deep)])
+def MLP_B_real(deep):
+    
+    return nn.Sequential(*[nn.Sequential(
+            nn.Linear(128, 128),
+            nn.PReLU(),
+            Rearrange('b c w h -> b c h w'),
+            nn.Linear(128, 128),
+            nn.PReLU(),
+            Rearrange('b c h w -> b w h c'),
+            nn.Linear(3, 3),
+            nn.PReLU(),
+            Rearrange('b w h c -> b c w h'),
+            nn.Linear(128, 128),
+            nn.PReLU(),      
+        ) for _ in range(deep)])
+def MLP_B_imag(deep):
     
     return nn.Sequential(*[nn.Sequential(
             nn.Linear(128, 128),
@@ -60,7 +89,23 @@ def MLP_B(deep):
         ) for _ in range(deep)])
     
 
-def MLP_C(deep):
+def MLP_C_real(deep):
+    
+    return nn.Sequential(*[nn.Sequential(
+            nn.Linear(256, 256),
+            nn.PReLU(),
+            Rearrange('b c w h -> b c h w'),
+            nn.Linear(256, 256),
+            nn.PReLU(),
+            Rearrange('b c h w -> b w h c'),
+            nn.Linear(3, 3),
+            nn.PReLU(),
+            Rearrange('b w h c -> b c w h'),
+            nn.Linear(256, 256),
+            nn.PReLU(),      
+        ) for _ in range(deep)])
+    
+def MLP_C_imag(deep):
     
     return nn.Sequential(*[nn.Sequential(
             nn.Linear(256, 256),
@@ -82,9 +127,13 @@ class Zero_Net(nn.Module):
         super().__init__()
         self.net = UNet(n_channels=12)
         self.app = ApplyCoeffs()
-        self.a_path = MLP_A(4)
-        self.b_path = MLP_B(4)
-        self.c_path = MLP_C(4)
+        self.a_path_real = MLP_A_real(4)
+        self.b_path_real = MLP_B_real(4)
+        self.c_path_real = MLP_C_real(4)
+        
+        self.a_path_imag = MLP_A_imag(4)
+        self.b_path_imag = MLP_B_imag(4)
+        self.c_path_imag = MLP_C_imag(4)
        
         
         
@@ -93,9 +142,25 @@ class Zero_Net(nn.Module):
         input_b = F.interpolate(x, size=[128, 128],   mode='bilinear', align_corners=True)
         input_c = F.interpolate(x, size=[256, 256],   mode='bilinear', align_corners=True)
 
-        coeff_a = self.a_path(input_a)
-        coeff_b = self.b_path(input_b)
-        coeff_c = self.c_path(input_c)
+        a_f = torch.fft.fft2(input_a)
+        a_f_real = a_f.real
+        a_f_imag = a_f.imag
+        
+        b_f = torch.fft.fft2(input_b)
+        b_f_real = b_f.real
+        b_f_imag = b_f.imag
+        
+        c_f = torch.fft.fft2(input_c)
+        c_f_real = c_f.real
+        c_f_imag = c_f.imag
+
+        
+        
+        coeff_a = torch.real(torch.fft.ifft2(torch.complex(self.a_path_real(a_f_real), self.a_path_imag(a_f_imag))))
+        coeff_b = torch.real(torch.fft.ifft2(torch.complex(self.b_path_real(b_f_real), self.b_path_imag(b_f_imag))))
+        coeff_c = torch.real(torch.fft.ifft2(torch.complex(self.c_path_real(c_f_real), self.c_path_imag(c_f_imag))))
+        
+
         
         
         
