@@ -2,7 +2,7 @@
 UHD Image Deblurring via Multi-scale Cubic-Mixer
 
 # Framework
-![](framework.png)
+![Image text](framework.png)
 
 
 # Abstract
